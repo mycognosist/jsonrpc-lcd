@@ -1,0 +1,10 @@
+[package]
+name = "jsonrpc-lcd"
+version = "0.1.0"
+authors = ["Andrew Reid <gnomad@cryptolab.net>"]
+edition = "2018"
+
+[dependencies]
+jsonrpc-http-server = "10.0"
+linux-embedded-hal = "0.2"
+hd44780-driver = { path = "../hd44780-driver" }
