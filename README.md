@@ -47,4 +47,4 @@ LCD pin-out is as follows (this can be altered in `src/main.rs`):
 `db6 : 480`  
 `db7 : 485`
 
-_Note: Pin numbers are offset by 458 for Debian on RPi3.__
+_Note: Pin numbers are offset by 458 for Debian on RPi3._
