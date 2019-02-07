@@ -71,11 +71,11 @@ fn lcd_init() -> hd44780_driver::HD44780<linux_embedded_hal::Delay, hd44780_driv
 fn clock(run_clock: Arc<AtomicBool>, lcd_clone: Arc<Mutex<hd44780_driver::HD44780<linux_embedded_hal::Delay, hd44780_driver::bus::FourBitBus<linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin>>>>) {
     // initialize the display
     let run_clock = Arc::clone(&run_clock);
-    let mut lcd = lcd_clone.lock().unwrap();
     loop {
         // check the value of the run_clock boolean expression
         // if true: update the time and write to display each second
         if run_clock.load(Ordering::SeqCst) {
+            let mut lcd = lcd_clone.lock().unwrap();
             let dt = Local::now();
             // display time in hour:minute format
             let current_time = format!(
@@ -110,6 +110,7 @@ fn main() {
     // write welcome message to the display
     io.add_method("welcome", move |_| {
         let mut lcd = lcd_clone.lock().unwrap();
+        lcd.clear();
         lcd.write_str("Welcome to");
         lcd.set_cursor_pos(42);
         lcd.write_str("PeachCloud :)");
@@ -150,6 +151,7 @@ fn main() {
 
     io.add_method("ap_mode", move |_| {
         let mut lcd = lcd_clone.lock().unwrap();
+        lcd.clear();
         lcd.write_str("Access-point");
         lcd.set_cursor_pos(42);
         lcd.write_str("activated");
@@ -161,6 +163,7 @@ fn main() {
 
     io.add_method("client_mode", move |_| {
         let mut lcd = lcd_clone.lock().unwrap();
+        lcd.clear();
         lcd.write_str("Client-mode");
         lcd.set_cursor_pos(42);
         lcd.write_str("activated");
