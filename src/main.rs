@@ -68,10 +68,10 @@ fn lcd_init() -> hd44780_driver::HD44780<linux_embedded_hal::Delay, hd44780_driv
 }
 
 // start displaying clock on the display
-fn clock(run_clock: Arc<AtomicBool>) {
+fn clock(run_clock: Arc<AtomicBool>, lcd_clone: Arc<Mutex<hd44780_driver::HD44780<linux_embedded_hal::Delay, hd44780_driver::bus::FourBitBus<linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin>>>>) {
     // initialize the display
-    let mut lcd = lcd_init();
     let run_clock = Arc::clone(&run_clock);
+    let mut lcd = lcd_clone.lock().unwrap();
     loop {
         // check the value of the run_clock boolean expression
         // if true: update the time and write to display each second
@@ -95,7 +95,7 @@ fn clock(run_clock: Arc<AtomicBool>) {
 fn main() {
 
     // initialize the display
-    lcd_init();
+    let lcd = Arc::new(Mutex::new(lcd_init()));
 
     // create a thread-safe reference-counting pointer (boolean)
     // this allows us to track the state of the clock (on / off)
@@ -104,16 +104,22 @@ fn main() {
     // create an IoHandler for the jsonrpc server
     let mut io = IoHandler::default();
 
+    // clone lcd object so we can move it into "welcome" method
+    let lcd_clone = Arc::clone(&lcd);
+
     // write welcome message to the display
-    io.add_method("welcome", |_| {
-        let mut lcd = lcd_init();
+    io.add_method("welcome", move |_| {
+        let mut lcd = lcd_clone.lock().unwrap();
         lcd.write_str("Welcome to");
         lcd.set_cursor_pos(42);
         lcd.write_str("PeachCloud :)");
         Ok(Value::String("success".into()))
     });
     
-    // clone the clock_running pointer to allow it to be passed into clock_on
+    // clone lcd object so we can move it into "welcome" method
+    let lcd_clone = Arc::clone(&lcd);
+
+    // clone clock_running pointer to allow it to be passed into clock_on
     let run_clock = Arc::clone(&clock_running);
 
     // write the time to the display (clock)
@@ -121,10 +127,11 @@ fn main() {
         // set clock pointer to true (on)
         run_clock.store(true, Ordering::SeqCst);
         let run_clock = Arc::clone(&run_clock);
+        let lcd_clone = Arc::clone(&lcd_clone);
         thread::spawn(move || {
             // call the clock function to start displaying timer
             // pass in the clock pointer
-            clock(run_clock);
+            clock(run_clock, lcd_clone);
         });
         Ok(Value::String("success".into()))
     });
@@ -138,16 +145,22 @@ fn main() {
         Ok(Value::String("success".into()))
     });
 
-    io.add_method("ap_mode", |_| {
-        let mut lcd = lcd_init();
+    // clone lcd object so we can move it into "ap_mode" method
+    let lcd_clone = Arc::clone(&lcd);
+
+    io.add_method("ap_mode", move |_| {
+        let mut lcd = lcd_clone.lock().unwrap();
         lcd.write_str("Access-point");
         lcd.set_cursor_pos(42);
         lcd.write_str("activated");
         Ok(Value::String("success".into()))
     });
 
-    io.add_method("client_mode", |_| {
-        let mut lcd = lcd_init();
+    // clone lcd object so we can move it into "client_mode" method
+    let lcd_clone = Arc::clone(&lcd);
+
+    io.add_method("client_mode", move |_| {
+        let mut lcd = lcd_clone.lock().unwrap();
         lcd.write_str("Client-mode");
         lcd.set_cursor_pos(42);
         lcd.write_str("activated");
