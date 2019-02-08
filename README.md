@@ -21,6 +21,10 @@ Run the binary (sudo needed to satisfy permission requirements):
 
 `sudo ./target/debug/jsonrpc-lcd`
 
+-----
+
+**Write a Message to the Display**
+
 Open a second terminal window and use `curl` to call server methods:
 
 `curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "welcome", "id":1 }' 127.0.0.1:3030`
@@ -35,6 +39,28 @@ The following text is written to the LCD display:
 `  PeachCloud :)`
 
 Other methods include `ap_mode` and `client_mode`.
+
+If the clock is running, an attempted call of `welcome`, `ap-mode` or `client-mode` responds with:
+
+`{"jsonrpc":"2.0","result":"failed to obtain lock on lcd","id":1}`
+
+Clock must first be turned off before other write methods can be called successfully:
+
+`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "clock_off", "id":1 }' 127.0.0.1:3030`
+
+-----
+
+**Write a Clock to the Display**
+
+Open a second terminal window and use `curl` to call server methods:
+
+`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "clock_on", "id":1 }' 127.0.0.1:3030`
+
+Server responds with:
+
+`{"jsonrpc":"2.0","result":"success","id":1}`
+
+Time on the display updates every second.
 
 ### Pin Definitions
 
