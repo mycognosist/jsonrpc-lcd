@@ -1,4 +1,5 @@
 use std::thread;
+use std::thread::sleep;
 use std::time::Duration;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -10,6 +11,22 @@ use linux_embedded_hal::sysfs_gpio::Direction;
 use hd44780_driver::{HD44780, DisplayMode, Cursor, CursorBlink, Display};
 use crossbeam_channel::tick;
 use chrono::prelude::*;
+
+// led heartbeat
+fn heartbeat_led() {
+
+    let hb = Pin::new(462);
+
+    hb.export().unwrap();
+    hb.set_direction(Direction::Low).unwrap();
+
+    loop {
+        hb.set_value(0).unwrap();
+        sleep(Duration::from_millis(500));
+        hb.set_value(1).unwrap();
+        sleep(Duration::from_millis(500));
+    }
+}
 
 // initialize the display
 fn lcd_init() -> hd44780_driver::HD44780<linux_embedded_hal::Delay, hd44780_driver::bus::FourBitBus<linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin>> {
@@ -105,6 +122,11 @@ fn clock(run_clock: Arc<AtomicBool>, lcd_clone: Arc<Mutex<hd44780_driver::HD4478
 }
 
 fn main() {
+
+    // blink heartbeat led
+    thread::spawn( || {
+        heartbeat_led();
+    });
 
     // initialize the display
     let lcd = Arc::new(Mutex::new(lcd_init()));
