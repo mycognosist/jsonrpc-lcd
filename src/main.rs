@@ -1,20 +1,19 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
-use jsonrpc_http_server::*;
-use jsonrpc_http_server::jsonrpc_core::*;
-use linux_embedded_hal::{Delay, Pin};
-use linux_embedded_hal::sysfs_gpio::Direction;
-use hd44780_driver::{HD44780, DisplayMode, Cursor, CursorBlink, Display};
-use crossbeam_channel::tick;
 use chrono::prelude::*;
+use crossbeam_channel::tick;
+use hd44780_driver::{Cursor, CursorBlink, Display, DisplayMode, HD44780};
+use jsonrpc_http_server::jsonrpc_core::*;
+use jsonrpc_http_server::*;
+use linux_embedded_hal::sysfs_gpio::Direction;
+use linux_embedded_hal::{Delay, Pin};
 
 // led heartbeat
 fn heartbeat_led() {
-
     let hb = Pin::new(462);
 
     hb.export().unwrap();
@@ -29,8 +28,17 @@ fn heartbeat_led() {
 }
 
 // initialize the display
-fn lcd_init() -> hd44780_driver::HD44780<linux_embedded_hal::Delay, hd44780_driver::bus::FourBitBus<linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin>> {
-
+fn lcd_init() -> hd44780_driver::HD44780<
+    linux_embedded_hal::Delay,
+    hd44780_driver::bus::FourBitBus<
+        linux_embedded_hal::Pin,
+        linux_embedded_hal::Pin,
+        linux_embedded_hal::Pin,
+        linux_embedded_hal::Pin,
+        linux_embedded_hal::Pin,
+        linux_embedded_hal::Pin,
+    >,
+> {
     let rs = Pin::new(484);
     let en = Pin::new(477);
 
@@ -55,34 +63,40 @@ fn lcd_init() -> hd44780_driver::HD44780<linux_embedded_hal::Delay, hd44780_driv
     db6.set_direction(Direction::Low).unwrap();
     db7.set_direction(Direction::Low).unwrap();
 
-    let mut lcd = HD44780::new_4bit(
-        rs,
-        en,
-        db4,
-        db5,
-        db6,
-        db7,
-        Delay,
-    );
+    let mut lcd = HD44780::new_4bit(rs, en, db4, db5, db6, db7, Delay);
 
     lcd.reset();
 
     lcd.clear();
 
-    lcd.set_display_mode(
-        DisplayMode {
-            display: Display::On,
-            cursor_visibility: Cursor::Invisible,
-            cursor_blink: CursorBlink::Off,
-        }
-    );
+    lcd.set_display_mode(DisplayMode {
+        display: Display::On,
+        cursor_visibility: Cursor::Invisible,
+        cursor_blink: CursorBlink::Off,
+    });
 
     lcd
 }
 
 // loop to write clock to display, updates every second
-fn clock(run_clock: Arc<AtomicBool>, lcd_clone: Arc<Mutex<hd44780_driver::HD44780<linux_embedded_hal::Delay, hd44780_driver::bus::FourBitBus<linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin, linux_embedded_hal::Pin>>>>) {
-
+fn clock(
+    run_clock: Arc<AtomicBool>,
+    lcd_clone: Arc<
+        Mutex<
+            hd44780_driver::HD44780<
+                linux_embedded_hal::Delay,
+                hd44780_driver::bus::FourBitBus<
+                    linux_embedded_hal::Pin,
+                    linux_embedded_hal::Pin,
+                    linux_embedded_hal::Pin,
+                    linux_embedded_hal::Pin,
+                    linux_embedded_hal::Pin,
+                    linux_embedded_hal::Pin,
+                >,
+            >,
+        >,
+    >,
+) {
     // setup the timer
     let timer = tick(Duration::from_millis(1000));
 
@@ -96,7 +110,6 @@ fn clock(run_clock: Arc<AtomicBool>, lcd_clone: Arc<Mutex<hd44780_driver::HD4478
         // check the value of the run_clock boolean expression
         // - if true: update the time and write to display each second
         if run_clock.load(Ordering::SeqCst) {
-            
             // listen for 'tick' event from timer (blocking)
             timer.recv().unwrap();
 
@@ -113,18 +126,16 @@ fn clock(run_clock: Arc<AtomicBool>, lcd_clone: Arc<Mutex<hd44780_driver::HD4478
 
             lcd.clear();
             lcd.write_str(&current_time);
-
         } else {
             // break out of the clock loop so other msgs can be displayed
             break;
         };
-    };
+    }
 }
 
 fn main() {
-
     // blink heartbeat led
-    thread::spawn( || {
+    thread::spawn(|| {
         heartbeat_led();
     });
 
@@ -134,7 +145,7 @@ fn main() {
     // create a thread-safe reference-counting pointer (boolean)
     // - this allows us to track the state of the clock (on / off)
     let clock_running = Arc::new(AtomicBool::new(false));
-    
+
     // create an IoHandler for the jsonrpc server
     let mut io = IoHandler::default();
 
@@ -153,13 +164,13 @@ fn main() {
             Ok(Value::String("success".into()))
         } else {
             // return error if lcd lock is held by another thread
-            Ok(Value::String("failed to obtain lock on lcd".into()))
+            Err(Error::new(ErrorCode::ServerError(-34)))
         }
     });
-    
+
     // clone lcd object so we can move it into "ap_mode" method
     let lcd_clone = Arc::clone(&lcd);
-    
+
     // write ap_mode activated message to the display
     io.add_method("ap_mode", move |_| {
         let mut lcd = lcd_clone.try_lock();
@@ -170,7 +181,7 @@ fn main() {
             lcd.write_str("activated");
             Ok(Value::String("success".into()))
         } else {
-            Ok(Value::String("failed to obtain lock on lcd".into()))
+            Err(Error::new(ErrorCode::ServerError(-34)))
         }
     });
 
@@ -186,7 +197,7 @@ fn main() {
             lcd.write_str("activated");
             Ok(Value::String("success".into()))
         } else {
-            Ok(Value::String("failed to obtain lock on lcd".into()))
+            Err(Error::new(ErrorCode::ServerError(-34)))
         }
     });
 
@@ -221,8 +232,9 @@ fn main() {
     });
 
     let server = ServerBuilder::new(io)
-        .cors(DomainsValidation::AllowOnly(
-                vec![AccessControlAllowOrigin::Null]))
+        .cors(DomainsValidation::AllowOnly(vec![
+            AccessControlAllowOrigin::Null,
+        ]))
         .start_http(&"127.0.0.1:3030".parse().unwrap())
         .expect("Unable to start RPC server");
 
