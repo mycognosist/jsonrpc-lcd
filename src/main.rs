@@ -97,38 +97,26 @@ fn clock(
         >,
     >,
 ) {
-    // setup the timer
     let timer = tick(Duration::from_millis(1000));
-
-    // clone the lcd object
     let run_clock = Arc::clone(&run_clock);
-
-    // place a lock on the lcd object
     let mut lcd = lcd_clone.lock().unwrap();
 
     loop {
-        // check the value of the run_clock boolean expression
-        // - if true: update the time and write to display each second
+        // get time & print to display if run_clock is true
         if run_clock.load(Ordering::SeqCst) {
-            // listen for 'tick' event from timer (blocking)
             timer.recv().unwrap();
-
-            // get current time
             let dt = Local::now();
-
-            // display time in hour:minute:second format
             let current_time = format!(
-                "{h}:{m}:{s}",
-                h = dt.hour(),
-                m = dt.minute(),
-                s = dt.second()
+                "{:02}:{:02}:{:02}",
+                dt.hour(),
+                dt.minute(),
+                dt.second()
             );
-
             lcd.clear();
             lcd.write_str(&current_time);
-
         } else {
-            // break out of the clock loop so other msgs can be displayed
+            // break out of loop once run_clock is set to false
+            // this released the lock on the lcd mutex
             break;
         };
     }
@@ -136,27 +124,16 @@ fn clock(
 
 fn main() {
 
-    // blink heartbeat led
     thread::spawn(|| {
         heartbeat_led();
     });
 
-    // initialize the display
     let lcd = Arc::new(Mutex::new(lcd_init()));
-
-    // create a thread-safe reference-counting pointer (boolean)
-    // - this allows us to track the state of the clock (on / off)
     let clock_running = Arc::new(AtomicBool::new(false));
-
-    // create an IoHandler for the jsonrpc server
     let mut io = IoHandler::default();
-
-    // clone lcd object so we can move it into "welcome" method
     let lcd_clone = Arc::clone(&lcd);
 
-    // write welcome message to the display
     io.add_method("welcome", move |_| {
-        // try to obtain a lock on the lcd object
         let mut lcd = lcd_clone.try_lock();
         if let Ok(ref mut lcd) = lcd {
             lcd.clear();
@@ -165,15 +142,12 @@ fn main() {
             lcd.write_str("PeachCloud :)");
             Ok(Value::String("success".into()))
         } else {
-            // return error if lcd lock is held by another thread
             Err(Error::new(ErrorCode::ServerError(-34)))
         }
     });
 
-    // clone lcd object so we can move it into "ap_mode" method
     let lcd_clone = Arc::clone(&lcd);
 
-    // write ap_mode activated message to the display
     io.add_method("ap_mode", move |_| {
         let mut lcd = lcd_clone.try_lock();
         if let Ok(ref mut lcd) = lcd {
@@ -187,7 +161,6 @@ fn main() {
         }
     });
 
-    // clone lcd object so we can move it into "client_mode" method
     let lcd_clone = Arc::clone(&lcd);
 
     io.add_method("client_mode", move |_| {
@@ -203,22 +176,14 @@ fn main() {
         }
     });
 
-    // clone lcd object so we can move it into "clock_on" method
     let lcd_clone = Arc::clone(&lcd);
-
-    // clone clock_running pointer to allow it to be passed into clock_on
     let run_clock = Arc::clone(&clock_running);
 
-    // write the time to the display (clock)
     io.add_method("clock_on", move |_| {
-        // set clock pointer to true (on)
         run_clock.store(true, Ordering::SeqCst);
         let run_clock = Arc::clone(&run_clock);
-        // clone lcd object so we can move it into the "clock" function
         let lcd_clone = Arc::clone(&lcd_clone);
         thread::spawn(move || {
-            // call the clock function to start displaying timer
-            // pass in the clock pointer & cloned lcd object
             clock(run_clock, lcd_clone);
         });
         Ok(Value::String("success".into()))
@@ -227,8 +192,6 @@ fn main() {
     let run_clock = Arc::clone(&clock_running);
 
     io.add_method("clock_off", move |_| {
-        // set clock pointer to false (off)
-        // this breaks the loop in clock()
         run_clock.store(false, Ordering::SeqCst);
         Ok(Value::String("success".into()))
     });
