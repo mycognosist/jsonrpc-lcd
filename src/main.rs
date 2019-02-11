@@ -126,6 +126,7 @@ fn clock(
 
             lcd.clear();
             lcd.write_str(&current_time);
+
         } else {
             // break out of the clock loop so other msgs can be displayed
             break;
@@ -134,6 +135,7 @@ fn clock(
 }
 
 fn main() {
+
     // blink heartbeat led
     thread::spawn(|| {
         heartbeat_led();
