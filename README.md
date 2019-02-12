@@ -1,6 +1,6 @@
 ## jsonrpc-lcd
 
-Write to an HD44780-compatible LCD display using JSON-RPC over http. Proof of concept inspired by conversations with [@ahdinosaur](https://github.com/ahdinosaur) about [JSON-RPC](https://www.jsonrpc.org/specification) microservices.
+Write to an HD44780-compatible 16x2 LCD display using JSON-RPC over http. Proof of concept inspired by conversations with [@ahdinosaur](https://github.com/ahdinosaur) about [JSON-RPC](https://www.jsonrpc.org/specification) microservices.
 
 ### Setup
 
@@ -19,44 +19,40 @@ Run the binary (sudo needed to satisfy permission requirements):
 
 -----
 
-**Write a Message to the Display**
+**Write Text to the Display**
 
 Open a second terminal window and use `curl` to call server methods:
 
-`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "welcome", "id":1 }' 127.0.0.1:3030`
+`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "write", "params" : {"position": 0, "string": "Welcome to" }, "id":1 }' 127.0.0.1:3030`
 
 Server responds with:
 
 `{"jsonrpc":"2.0","result":"success","id":1}`
 
-The following text is written to the LCD display:
+LCD display shows:
 
-`Welcome to`  
-`  PeachCloud :)`
+`Welcome to`
 
-Other methods include `ap_mode` and `client_mode`.
+Write to the second line of the display:
 
-If the clock is running, an attempted call of `welcome`, `ap-mode` or `client-mode` responds with:
+`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "write", "params" : {"position": 40, "string": "PeachCloud!" }, "id":1 }' 127.0.0.1:3030`
 
-`{"jsonrpc":"2.0","error":{"code":-34,"message":"Server error"},"id":1}`
+LCD display shows:
 
-Clock must first be turned off before other write methods can be called successfully:
-
-`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "clock_off", "id":1 }' 127.0.0.1:3030`
+`Welcome to`
+`PeachCloud!`
 
 -----
 
-**Write a Clock to the Display**
+**Clear the Display**
 
 Open a second terminal window and use `curl` to call server methods:
 
-`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "clock_on", "id":1 }' 127.0.0.1:3030`
+`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "clear", "id":1 }' 127.0.0.1:3030`
 
 Server responds with:
 
 `{"jsonrpc":"2.0","result":"success","id":1}`
-
-Time on the display updates every second.
 
 ### Pin Definitions
 

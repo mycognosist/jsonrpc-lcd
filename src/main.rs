@@ -7,11 +7,9 @@ use linux_embedded_hal::sysfs_gpio::Direction;
 use linux_embedded_hal::{Delay, Pin};
 
 #[derive(Deserialize, Debug)]
-pub struct WriteMsg {
-    cur_pos_1: u8,
-    line_1: String,
-    cur_pos_2: u8,
-    line_2: String,
+pub struct Msg {
+    position: u8,
+    string: String,
  }
 
 fn lcd_init() -> hd44780_driver::HD44780<
@@ -71,16 +69,21 @@ fn main() {
    
     io.add_method("write", move |params: Params| {
         // todo: handle Result type explicitly - no unwraps
-        let w : WriteMsg = params.parse().unwrap();
+        let m : Msg = params.parse().unwrap();
         // todo: implement try_unlock() & handle Result explicitly
         let mut lcd = lcd_clone.lock().unwrap();
-        lcd.clear();
-        lcd.set_cursor_pos(w.cur_pos_1);
-        lcd.write_str(&w.line_1);
-        lcd.set_cursor_pos(w.cur_pos_2);
-        lcd.write_str(&w.line_2);
+        lcd.set_cursor_pos(m.position);
+        lcd.write_str(&m.string);
         Ok(Value::String("success".into()))
         // todo: add custom error message with Failure
+    });
+
+    let lcd_clone = Arc::clone(&lcd);
+    
+    io.add_method("clear", move |_| {
+        let mut lcd = lcd_clone.lock().unwrap();
+        lcd.clear();
+        Ok(Value::String("success".into()))
     });
 
     let server = ServerBuilder::new(io)
