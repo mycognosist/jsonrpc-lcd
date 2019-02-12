@@ -54,6 +54,20 @@ Server responds with:
 
 `{"jsonrpc":"2.0","result":"success","id":1}`
 
+-----
+
+**Reset the Display**
+
+Open a second terminal window and use `curl` to call server methods:
+
+`curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "method": "reset", "id":1 }' 127.0.0.1:3030`
+
+Server responds with:
+
+`{"jsonrpc":"2.0","result":"success","id":1}`
+
+-----
+
 ### Pin Definitions
 
 LCD pin-out is as follows (this can be altered in `src/main.rs`):

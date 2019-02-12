@@ -86,6 +86,14 @@ fn main() {
         Ok(Value::String("success".into()))
     });
 
+    let lcd_clone = Arc::clone(&lcd);
+    
+    io.add_method("reset", move |_| {
+        let mut lcd = lcd_clone.lock().unwrap();
+        lcd.reset();
+        Ok(Value::String("success".into()))
+    });
+
     let server = ServerBuilder::new(io)
         .cors(DomainsValidation::AllowOnly(vec![
             AccessControlAllowOrigin::Null,
