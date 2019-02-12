@@ -4,10 +4,6 @@ Write to an HD44780-compatible LCD display using JSON-RPC over http. Proof of co
 
 ### Setup
 
-Clone the [hd44780-driver repo](https://github.com/JohnDoneth/hd44780-driver) for Rust (_Note: this step will no longer be necessary once the [crate](https://crates.io/crates/hd44780-driver) has been bumped to 0.3.0._):
-
-`git clone https://github.com/JohnDoneth/hd44780-driver.git`
-
 Clone this repo:
 
 `git clone https://github.com/mycognosist/jsonrpc-lcd.git`
@@ -42,7 +38,7 @@ Other methods include `ap_mode` and `client_mode`.
 
 If the clock is running, an attempted call of `welcome`, `ap-mode` or `client-mode` responds with:
 
-`{"jsonrpc":"2.0","result":"failed to obtain lock on lcd","id":1}`
+`{"jsonrpc":"2.0","error":{"code":-34,"message":"Server error"},"id":1}`
 
 Clock must first be turned off before other write methods can be called successfully:
 
