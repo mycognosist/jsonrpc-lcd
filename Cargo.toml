@@ -5,8 +5,8 @@ authors = ["Andrew Reid <gnomad@cryptolab.net>"]
 edition = "2018"
 
 [dependencies]
+jsonrpc = "0.10.2"
 jsonrpc-http-server = "10.0"
 linux-embedded-hal = "0.2"
 hd44780-driver = { git = "https://github.com/JohnDoneth/hd44780-driver" }
-chrono = "0.4"
-crossbeam-channel = "0.3.8"
+serde = { version = "1.0.87", features = ["derive"] }
