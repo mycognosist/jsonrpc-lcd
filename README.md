@@ -39,7 +39,7 @@ Write to the second line of the display:
 
 LCD display shows:
 
-`Welcome to`
+`Welcome to`  
 `PeachCloud!`
 
 -----
