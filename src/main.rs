@@ -1,46 +1,47 @@
 #[macro_use]
 extern crate validator_derive;
-extern crate validator;
 extern crate failure;
+extern crate validator;
 
-use std::sync::{Arc, Mutex};
-use serde::Deserialize;
 use hd44780_driver::{Cursor, CursorBlink, Display, DisplayMode, HD44780};
 use jsonrpc_http_server::jsonrpc_core::*;
 use jsonrpc_http_server::*;
+use serde::Deserialize;
+use std::sync::{Arc, Mutex};
 //use jsonrpc_core as rpc;
+use failure::Fail;
 use linux_embedded_hal::sysfs_gpio::Direction;
 use linux_embedded_hal::{Delay, Pin};
-use validator::{Validate, ValidationError};
-use failure::Fail;
+use validator::{Validate, ValidationErrors};
 
+// define the Msg struct for receiving display write commands
 #[derive(Debug, Validate, Deserialize)]
 pub struct Msg {
-    #[validate(range(min = "0", max = "40"))]
+    #[validate(range(min = "0", max = "40", message = "Position not in range 0-40"))]
     position: u8,
-    #[validate(length(max = "40"))]
+    #[validate(length(max = "40", message = "String length > 40 characters"))]
     string: String,
 }
 
 #[derive(Debug, Fail)]
 pub enum WriteError {
     #[fail(display = "validation error")]
-    Invalid {}
+    Invalid { e: ValidationErrors },
 }
 
 impl From<WriteError> for Error {
     fn from(err: WriteError) -> Self {
         match &err {
-            WriteError::Invalid {} => Error {
+            WriteError::Invalid { e } => Error {
                 code: ErrorCode::ServerError(1),
-                message: err.name().unwrap().to_string(),
-                data: Some(err.to_string().into())
+                message: "validation error".into(),
+                data: Some(format!("{:?}", e).into()),
             },
             err => Error {
                 code: ErrorCode::InternalError,
                 message: "internal error".into(),
-                data: Some(format!("{:?}", err).into())
-            }
+                data: Some(format!("{:?}", err).into()),
+            },
         }
     }
 }
@@ -95,14 +96,13 @@ fn lcd_init() -> hd44780_driver::HD44780<
 }
 
 fn main() {
-
     let lcd = Arc::new(Mutex::new(lcd_init()));
     let lcd_clone = Arc::clone(&lcd);
     let mut io = IoHandler::default();
-   
+
     io.add_method("write", move |params: Params| {
         // todo: handle Result type explicitly - no unwraps
-        let m : Msg = params.parse().unwrap();
+        let m: Msg = params.parse().unwrap();
         // todo: implement try_unlock() & handle Result explicitly
         match m.validate() {
             Ok(_) => {
@@ -110,14 +110,33 @@ fn main() {
                 lcd.set_cursor_pos(m.position);
                 lcd.write_str(&m.string);
                 Ok(Value::String("success".into()))
-            },
+            }
             // todo: add custom error message with Failure
-            Err(e) => Err(Error::from(WriteError::Invalid{}))
+            Err(e) => {
+                let msg = e.clone();
+                let invalid_msg = msg.field_errors();
+                println!("{:?}", invalid_msg);
+                let m = "position";
+                let im = invalid_msg.get(&m);
+                println!("{:?}", im);
+                // matches on "position" but not on "string"
+                match im {
+                    Some(er) => {
+                        let err_msg = &er[0].message;
+                        match err_msg {
+                            Some(e) => println!("{:?}", e),
+                            None => ()
+                        }
+                    },
+                    None => ()
+                }
+                Err(Error::from(WriteError::Invalid { e }))
+            },
         }
     });
 
     let lcd_clone = Arc::clone(&lcd);
-    
+
     io.add_method("clear", move |_| {
         let mut lcd = lcd_clone.lock().unwrap();
         lcd.clear();
@@ -125,7 +144,7 @@ fn main() {
     });
 
     let lcd_clone = Arc::clone(&lcd);
-    
+
     io.add_method("reset", move |_| {
         let mut lcd = lcd_clone.lock().unwrap();
         lcd.reset();
