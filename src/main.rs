@@ -1,16 +1,49 @@
+#[macro_use]
+extern crate validator_derive;
+extern crate validator;
+extern crate failure;
+
 use std::sync::{Arc, Mutex};
 use serde::Deserialize;
 use hd44780_driver::{Cursor, CursorBlink, Display, DisplayMode, HD44780};
 use jsonrpc_http_server::jsonrpc_core::*;
 use jsonrpc_http_server::*;
+//use jsonrpc_core as rpc;
 use linux_embedded_hal::sysfs_gpio::Direction;
 use linux_embedded_hal::{Delay, Pin};
+use validator::{Validate, ValidationError};
+use failure::Fail;
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Validate, Deserialize)]
 pub struct Msg {
+    #[validate(range(min = "0", max = "40"))]
     position: u8,
+    #[validate(length(max = "40"))]
     string: String,
- }
+}
+
+#[derive(Debug, Fail)]
+pub enum WriteError {
+    #[fail(display = "validation error")]
+    Invalid {}
+}
+
+impl From<WriteError> for Error {
+    fn from(err: WriteError) -> Self {
+        match &err {
+            WriteError::Invalid {} => Error {
+                code: ErrorCode::ServerError(1),
+                message: err.name().unwrap().to_string(),
+                data: Some(err.to_string().into())
+            },
+            err => Error {
+                code: ErrorCode::InternalError,
+                message: "internal error".into(),
+                data: Some(format!("{:?}", err).into())
+            }
+        }
+    }
+}
 
 fn lcd_init() -> hd44780_driver::HD44780<
     linux_embedded_hal::Delay,
@@ -71,11 +104,16 @@ fn main() {
         // todo: handle Result type explicitly - no unwraps
         let m : Msg = params.parse().unwrap();
         // todo: implement try_unlock() & handle Result explicitly
-        let mut lcd = lcd_clone.lock().unwrap();
-        lcd.set_cursor_pos(m.position);
-        lcd.write_str(&m.string);
-        Ok(Value::String("success".into()))
-        // todo: add custom error message with Failure
+        match m.validate() {
+            Ok(_) => {
+                let mut lcd = lcd_clone.lock().unwrap();
+                lcd.set_cursor_pos(m.position);
+                lcd.write_str(&m.string);
+                Ok(Value::String("success".into()))
+            },
+            // todo: add custom error message with Failure
+            Err(e) => Err(Error::from(WriteError::Invalid{}))
+        }
     });
 
     let lcd_clone = Arc::clone(&lcd);
