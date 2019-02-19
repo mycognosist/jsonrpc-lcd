@@ -42,6 +42,14 @@ LCD display shows:
 `Welcome to`  
 `PeachCloud!`
 
+Validation checks are performed for `position` and `string` write command parameters. An appropriate error is returned if the validation checks are not satisfied:
+
+`{"jsonrpc":"2.0","error":{"code":1,"message":"validation error","data":"position not in range 0-40"},"id":1}`
+
+`{"jsonrpc":"2.0","error":{"code":1,"message":"validation error","data":"string length > 40 characters"},"id":1}`
+
+_Note: The validation tests will later be changed to accommodate a larger OLED display._
+
 -----
 
 **Clear the Display**

@@ -8,7 +8,6 @@ use jsonrpc_http_server::jsonrpc_core::*;
 use jsonrpc_http_server::*;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
-//use jsonrpc_core as rpc;
 use failure::Fail;
 use linux_embedded_hal::sysfs_gpio::Direction;
 use linux_embedded_hal::{Delay, Pin};
@@ -17,9 +16,9 @@ use validator::{Validate, ValidationErrors};
 // define the Msg struct for receiving display write commands
 #[derive(Debug, Validate, Deserialize)]
 pub struct Msg {
-    #[validate(range(min = "0", max = "40", message = "Position not in range 0-40"))]
+    #[validate(range(min = "0", max = "40", message = "position not in range 0-40"))]
     position: u8,
-    #[validate(length(max = "40", message = "String length > 40 characters"))]
+    #[validate(length(max = "40", message = "string length > 40 characters"))]
     string: String,
 }
 
@@ -27,15 +26,39 @@ pub struct Msg {
 pub enum WriteError {
     #[fail(display = "validation error")]
     Invalid { e: ValidationErrors },
+
+    #[fail(display = "uncharacterized validation error")]
+    Unknown {},
 }
 
 impl From<WriteError> for Error {
     fn from(err: WriteError) -> Self {
         match &err {
-            WriteError::Invalid { e } => Error {
-                code: ErrorCode::ServerError(1),
-                message: "validation error".into(),
-                data: Some(format!("{:?}", e).into()),
+            WriteError::Invalid { e } => {
+                let err_clone = e.clone();
+                // extract error from ValidationErrors
+                let field_errs = err_clone.field_errors();
+                let checks = vec!["position", "string"];
+                // check source of validation err: "position" or "string"
+                for &error in &checks {
+                    let validation_err = field_errs.get(&error);
+                    if validation_err.is_some() {
+                        let validation_err = validation_err.unwrap();
+                        let err_msg = &validation_err[0].message;
+                        let em = err_msg.clone();
+                        let em = em.expect("failed to unwrap error msg");
+                        return Error {
+                            code: ErrorCode::ServerError(1),
+                            message: "validation error".into(),
+                            data: Some(format!("{}", em).into()),
+                        }
+                    }
+                }
+                Error {
+                    code: ErrorCode::ServerError(1),
+                    message: "validation error".into(),
+                    data: Some(format!("{:?}", e).into()),
+                }
             },
             err => Error {
                 code: ErrorCode::InternalError,
@@ -111,25 +134,7 @@ fn main() {
                 lcd.write_str(&m.string);
                 Ok(Value::String("success".into()))
             }
-            // todo: add custom error message with Failure
             Err(e) => {
-                let msg = e.clone();
-                let invalid_msg = msg.field_errors();
-                println!("{:?}", invalid_msg);
-                let m = "position";
-                let im = invalid_msg.get(&m);
-                println!("{:?}", im);
-                // matches on "position" but not on "string"
-                match im {
-                    Some(er) => {
-                        let err_msg = &er[0].message;
-                        match err_msg {
-                            Some(e) => println!("{:?}", e),
-                            None => ()
-                        }
-                    },
-                    None => ()
-                }
                 Err(Error::from(WriteError::Invalid { e }))
             },
         }
