@@ -48,6 +48,10 @@ Validation checks are performed for `position` and `string` parameters. An appro
 
 `{"jsonrpc":"2.0","error":{"code":1,"message":"validation error","data":"string length > 40 characters"},"id":1}`
 
+An error is returned if one or both of the expected parameters are not supplied:
+
+`{"jsonrpc":"2.0","error":{"code":-32602,"message":"invalid params","data":"Invalid params: missing field `position`."},"id":1}`
+
 _Note: The validation tests will later be changed to accommodate a larger OLED display._
 
 -----

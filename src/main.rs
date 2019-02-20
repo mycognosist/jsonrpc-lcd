@@ -3,14 +3,15 @@ extern crate validator_derive;
 extern crate failure;
 extern crate validator;
 
+use failure::Fail;
 use hd44780_driver::{Cursor, CursorBlink, Display, DisplayMode, HD44780};
+use jsonrpc_http_server::jsonrpc_core::types::error::Error;
 use jsonrpc_http_server::jsonrpc_core::*;
 use jsonrpc_http_server::*;
-use serde::Deserialize;
-use std::sync::{Arc, Mutex};
-use failure::Fail;
 use linux_embedded_hal::sysfs_gpio::Direction;
 use linux_embedded_hal::{Delay, Pin};
+use serde::Deserialize;
+use std::sync::{Arc, Mutex};
 use validator::{Validate, ValidationErrors};
 
 // define the Msg struct for receiving display write commands
@@ -27,8 +28,8 @@ pub enum WriteError {
     #[fail(display = "validation error")]
     Invalid { e: ValidationErrors },
 
-    #[fail(display = "uncharacterized validation error")]
-    Unknown {},
+    #[fail(display = "missing expected parameters")]
+    MissingParams { e: Error },
 }
 
 impl From<WriteError> for Error {
@@ -51,7 +52,7 @@ impl From<WriteError> for Error {
                             code: ErrorCode::ServerError(1),
                             message: "validation error".into(),
                             data: Some(format!("{}", em).into()),
-                        }
+                        };
                     }
                 }
                 Error {
@@ -59,6 +60,11 @@ impl From<WriteError> for Error {
                     message: "validation error".into(),
                     data: Some(format!("{:?}", e).into()),
                 }
+            }
+            WriteError::MissingParams { e } => Error {
+                code: ErrorCode::ServerError(-32602),
+                message: "invalid params".into(),
+                data: Some(format!("{}", e.message).into()),
             },
             err => Error {
                 code: ErrorCode::InternalError,
@@ -124,19 +130,24 @@ fn main() {
     let mut io = IoHandler::default();
 
     io.add_method("write", move |params: Params| {
-        // todo: handle Result type explicitly - no unwraps
-        let m: Msg = params.parse().unwrap();
-        // todo: implement try_unlock() & handle Result explicitly
-        match m.validate() {
+        // parse parameters and match on result
+        let m: Result<Msg> = params.parse();
+        match m {
+            // if result contains parameters, unwrap and validate
             Ok(_) => {
-                let mut lcd = lcd_clone.lock().unwrap();
-                lcd.set_cursor_pos(m.position);
-                lcd.write_str(&m.string);
-                Ok(Value::String("success".into()))
+                let m: Msg = m.unwrap();
+                match m.validate() {
+                    Ok(_) => {
+                        let mut lcd = lcd_clone.lock().unwrap();
+                        lcd.set_cursor_pos(m.position);
+                        lcd.write_str(&m.string);
+                        Ok(Value::String("success".into()))
+                    }
+                    Err(e) => Err(Error::from(WriteError::Invalid { e })),
+                }
             }
-            Err(e) => {
-                Err(Error::from(WriteError::Invalid { e }))
-            },
+            // if result contains an error, throw missing params error
+            Err(e) => Err(Error::from(WriteError::MissingParams { e })),
         }
     });
 
